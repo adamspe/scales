@@ -2,14 +2,29 @@
 <style>
 #container {
     margin-top: 100px;
+    margin-bottom: 30px;
+}
+ul#triads-view {
+    list-style: none;
+}
+.hide {
+    display: none;
 }
 </style>
 <div id="container"></div>
 <div id="controls">
+    <label for="roots">Root</label>
     <select id="roots"></select>
+    <label for="scales">Scale</label>
     <select id="scales">
         <option></option>
     </select>
+    <label for="triads">Highlight</label>
+    <select id="triads"></select>
+</div>
+<div id="triads-view" class="hide">
+    <h3>Triads</h3>
+    <ul></ul>
 </div>
 <script type="module">
 
@@ -17,11 +32,12 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 const FLAT = (note) => `${note}\u266D`;
 const SHARP = (note) => `${note}\u266F`;
-const NOTES = [ 'C',FLAT('D'),'D',FLAT('E'),'E','F',SHARP('F'),'G',SHARP('G'),'A',FLAT('B'),'B'];
-const NEXT_NOTE = (note) => {
-    const ni = NOTES.indexOf(note);
-    return ni < NOTES.length-1 ? NOTES[ni+1] : NOTES[0]
+const NOTES = [ 'C',SHARP('C'),'D',FLAT('E'),'E','F',SHARP('F'),'G',SHARP('G'),'A',FLAT('B'),'B'];
+const CIRCULAR_NEXT = (circularArray,current) => {
+    const i = circularArray.indexOf(current);
+    return i < circularArray.length-1 ? circularArray[i+1] : circularArray[0];
 };
+const NEXT_NOTE = (note) => CIRCULAR_NEXT(NOTES,note);
 
 class Scale {
     constructor(title,steps) {
@@ -33,29 +49,45 @@ class Scale {
     setRoot(root) {
         this.root = root;
         this.notes = this.steps.split('').reduce((notes,wh) => {
-            let n = NEXT_NOTE(notes[notes.length-1]);
-            if(wh === 'W') {
-                n = NEXT_NOTE(n);
-            } else if (wh === '3') {
-                // step and one half
-                n = NEXT_NOTE(n);
-                n = NEXT_NOTE(n);
-            }
-            notes.push(n);
-            return notes;
-        },[root]);
+                let n = NEXT_NOTE(notes[notes.length-1]);
+                if(wh === 'W') {
+                    n = NEXT_NOTE(n);
+                } else if (wh === '3') {
+                    // step and one half
+                    n = NEXT_NOTE(n);
+                    n = NEXT_NOTE(n);
+                }
+                notes.push(n);
+                return notes;
+            },[root]);
+        // steps, per my scales book, will loop back around CDEFGABC)
+        if(this.notes[0] === this.notes[this.notes.length-1]) {
+            this.notes.splice((this.notes.length-1),1);
+        }
+        this.triads = this.notes.map(one => {
+            const three = CIRCULAR_NEXT(this.notes,CIRCULAR_NEXT(this.notes,one))
+            const five = CIRCULAR_NEXT(this.notes,CIRCULAR_NEXT(this.notes,three))
+            return [one,three,five];
+        });
+        this.focusedTriad = null;       
     }
 
     toString() {
-        return `${this.root} ${this.title} \n${this.notes.join(' ')}`;
+        return `${this.root} ${this.title} \n${this.notes.join(' ')}\n${this.triads.join("\n")}`;
     }
 
     includes(note) {
         return this.notes.includes(note);
     }
 
-    isRoot(note) {
-        return note === this.root;
+    setFocusedTriad(triad) {
+        this.focusedTriad = triad;
+    }
+
+    highlightNote(note) {
+        return !!this.focusedTriad
+            ? this.focusedTriad.includes(note)
+            : note === this.root;
     }
 }
 
@@ -156,7 +188,7 @@ class String {
                 .attr("class","finger")
             const x = FRETS[i].x-(fretSeparation/2);
             fg.append("circle")
-                .attr("fill",!!scale && scale.isRoot(n) ? rootFill : "#fff")
+                .attr("fill",!!scale && scale.highlightNote(n) ? rootFill : "#fff")
                 .attr("stroke-width",0.5)
                 .attr("stroke",'#000')
                 .attr("r",fingerRadius)
@@ -190,13 +222,55 @@ const SCALES = [
 
 let currentRoot = 'C';
 let currentScale = null;
-function update() {
-    if(!!currentScale) {
-        currentScale.setRoot(currentRoot);
-        console.log(currentScale.toString());
+let currentTriad = -1;
+const triadsView = document.querySelector("#triads-view")
+const triadsUl = document.querySelector("#triads-view>ul");
+const triadsSelect = document.querySelector("select#triads");
+function update(what) {
+    if(what !== "triad") {
+        while(triadsSelect.firstChild) {
+            triadsSelect.removeChild(triadsSelect.lastChild);
+        }
+        const highLightRoot = document.createElement("option");
+        highLightRoot.innerHTML = "Root note";
+        triadsSelect.append(highLightRoot);
+        while(triadsUl.firstChild) {
+            triadsUl.removeChild(triadsUl.lastChild);
+        }
+        if(!!currentScale) {
+            triadsView.classList.remove("hide");
+            currentScale.setRoot(currentRoot);
+            console.log(currentScale.toString());
+            currentScale.triads.forEach((triad,index) => {
+                const [one,three,five] = triad;
+                const text = `[${index+1}] ${one} ${three} ${five}`;
+                
+                const opt = document.createElement("option");
+                opt.value = index;
+                opt.innerHTML = text;
+                triadsSelect.append(opt);
+
+                const li = document.createElement("li");
+                li.innerHTML = text;
+                triadsUl.appendChild(li);
+            });
+        } else {
+            triadsView.classList.add("hide");
+        }
     }
+
     strings.forEach(s => s.notes(currentScale));
 }
+
+triadsSelect.addEventListener("change",function() {
+    const triadIndex = parseInt(triadsSelect.value);
+    currentScale.setFocusedTriad(
+        !isNaN(triadIndex)
+            ? currentScale.triads[triadIndex]
+            : null
+    );
+    update('triad');
+});
 
 const rootsSelect = document.querySelector('select#roots');
 NOTES.forEach(n => {
@@ -206,7 +280,7 @@ NOTES.forEach(n => {
 });
 rootsSelect.addEventListener("change",function() {
     currentRoot = rootsSelect.value;
-    update();
+    update("root");
 });
 
 const scalesSelect = document.querySelector('select#scales');
@@ -219,7 +293,7 @@ scalesSelect.addEventListener("change",function() {
     currentScale = !!scalesSelect.value
         ? SCALES.find(s => s.title === scalesSelect.value)
         : null;
-    update();
+    update("scale");
 });
 
 // Append the SVG element.
