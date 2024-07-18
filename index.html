@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <pre>
 TODO
-toggle finger borders different colors 1-N
-keybindings to swap scales and what is highlighted rather than select inputs (+ instruction text)
-    want to be able to toggle between scales quickly like flip-cards
+toggle finger borders different colors for scale numbers
+toggle between notes and scale numbers
 calculate chord names for triads
 alternate tunings (add string notes to left of nut)
 </pre>
@@ -21,9 +20,7 @@ body {
     <label for="roots">Root</label>
     <select id="roots"></select>
     <label for="scales">Scale</label>
-    <select id="scales">
-        <option></option>
-    </select>
+    <select id="scales"></select>
     <label for="triads">Highlight</label>
     <select id="triads"></select>
 </div>
@@ -234,20 +231,21 @@ class String {
 const strings = ['E','B','G','D','A','E'].map((node,index) => new String(node,index));
 strings.forEach(s => s.draw().notes());
 
-const SCALES = [
-    new Scale("Major (Ionian)","WWHWWWH"),
-    new Scale("Natural minor (Aeolian)","WHWWHWW"),
-    new Scale("Dorian","WHWWWHW"),
-    new Scale("Phrygian","HWWWHWW"),
-    new Scale("Lydian","WWWHWWH"),
-    new Scale("Mixolydian","WWHWWHW"),
-    new Scale("Locrian","HWWHWWW"),
-    new Scale("Harmonic minor","WHWWH3"), // has a 1.5 step = 3
-    new Scale("Jazz melodic minor","WHWWWWH"),
-    new Scale("Lydian flat-seven","WWWHWHW"),
-    new Scale("Pentatonic (major)","WW3W3"),
-    new Scale("Pentatonic (minor)","3WW3W"),
-];
+const SCALES = {
+    a: null,
+    b: new Scale("Major (Ionian)","WWHWWWH"),
+    c: new Scale("Natural minor (Aeolian)","WHWWHWW"),
+    d: new Scale("Dorian","WHWWWHW"),
+    e: new Scale("Phrygian","HWWWHWW"),
+    f: new Scale("Lydian","WWWHWWH"),
+    g: new Scale("Mixolydian","WWHWWHW"),
+    h: new Scale("Locrian","HWWHWWW"),
+    i: new Scale("Harmonic minor","WHWWH3"), // has a 1.5 step = 3
+    j: new Scale("Jazz melodic minor","WHWWWWH"),
+    k: new Scale("Lydian flat-seven","WWWHWHW"),
+    l: new Scale("Pentatonic (major)","WW3W3"),
+    m: new Scale("Pentatonic (minor)","3WW3W"),
+};
 
 let currentRoot = 'C';
 let currentScale = null;
@@ -260,7 +258,8 @@ function update(what) {
             triadsSelect.removeChild(triadsSelect.lastChild);
         }
         const highLightRoot = document.createElement("option");
-        highLightRoot.innerHTML = !!currentScale ? "Root note" : '';
+        highLightRoot.value = 0;
+        highLightRoot.innerHTML = !!currentScale ? "[0] Root note" : '';
         triadsSelect.append(highLightRoot);
         details.innerHTML = '';
         if(!!currentScale) {
@@ -270,7 +269,7 @@ function update(what) {
                 const text = `[${index+1}] ${one} ${three} ${five}`;
                 
                 const opt = document.createElement("option");
-                opt.value = index;
+                opt.value = (index+1);
                 opt.innerHTML = text;
                 triadsSelect.append(opt);
             });
@@ -280,15 +279,25 @@ function update(what) {
     strings.forEach(s => s.notes(currentScale));
 }
 
-triadsSelect.addEventListener("change",function() {
-    const triadIndex = parseInt(triadsSelect.value);
-    currentScale.setFocusedTriad(
-        !isNaN(triadIndex)
-            ? currentScale.triads[triadIndex]
-            : null
-    );
-    update('triad');
-});
+function setTriad(triadIndex,updateSelect) {
+    if(!!currentScale) {
+        currentScale.setFocusedTriad(
+            (!isNaN(triadIndex) && triadIndex > 0 && triadIndex < (currentScale.triads.length+1))
+                ? currentScale.triads[triadIndex-1]
+                : null
+        );
+        update("triad");
+        if(updateSelect) {
+            for(let i = 0; i < triadsSelect.options.length; i++) {
+                if(triadIndex == triadsSelect.options[i].value) {
+                    triadsSelect.options[i].selected = true;
+                    break;
+                }
+            }
+        }
+    }
+}
+triadsSelect.addEventListener("change",() => setTriad(parseInt(triadsSelect.value)));
 
 const rootsSelect = document.querySelector('select#roots');
 NOTES.forEach(n => {
@@ -302,16 +311,37 @@ rootsSelect.addEventListener("change",function() {
 });
 
 const scalesSelect = document.querySelector('select#scales');
-SCALES.forEach(scale => {
+for(let keyBinding in SCALES) {
+    const scale = SCALES[keyBinding];
     const opt = document.createElement("option");
-    opt.value = opt.innerHTML = scale.title;
+    opt.value = opt.innerHTML = `[${keyBinding}] ${!!scale ? scale.title : 'All Notes'}`;
     scalesSelect.append(opt);
-});
-scalesSelect.addEventListener("change",function() {
-    currentScale = !!scalesSelect.value
-        ? SCALES.find(s => s.title === scalesSelect.value)
-        : null;
+}
+function setScale(keyBinding,updateSelect) {
+    currentScale = SCALES[keyBinding];
     update("scale");
+    if(updateSelect) {
+        const test = new RegExp(`^\\[${keyBinding}\\]`);
+        for(let i = 0; i < scalesSelect.options.length; i++) {
+            if(test.test(scalesSelect.options[i].value)) {
+                scalesSelect.options[i].selected = true;
+                break;
+            }
+        }
+    }
+}
+scalesSelect.addEventListener("change",() => setScale(/^\[(.*)\]/.exec(scalesSelect.value)[1]));
+
+document.addEventListener("keyup",function(event) {
+    if(Object.keys(SCALES).includes(event.key)) {
+        setScale(event.key,true);
+    } else if (!!currentScale && !isNaN(event.key)) {
+        let triadIndex = parseInt(event.key);
+        // avoid say pressing 8 from setting it back to "Root note"
+        if(triadIndex >= 0 && triadIndex < (currentScale.triads.length+1)) {
+            setTriad(triadIndex,true);
+        }
+    }2
 });
 
 // Append the SVG element.
