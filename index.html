@@ -1,14 +1,8 @@
 <!DOCTYPE html>
 <style>
 #container {
-    margin-top: 100px;
+    margin-top: 50px;
     margin-bottom: 30px;
-}
-ul#triads-view {
-    list-style: none;
-}
-.hide {
-    display: none;
 }
 </style>
 <div id="container"></div>
@@ -22,10 +16,7 @@ ul#triads-view {
     <label for="triads">Highlight</label>
     <select id="triads"></select>
 </div>
-<div id="triads-view" class="hide">
-    <h3>Triads</h3>
-    <ul></ul>
-</div>
+<pre id="details"></pre>
 <script type="module">
 
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
@@ -73,7 +64,8 @@ class Scale {
     }
 
     toString() {
-        return `${this.root} ${this.title} \n${this.notes.join(' ')}\n${this.triads.join("\n")}`;
+        const triads = this.triads.map((t,i) => `[${i+1}] ${t.join(' ')}`).join("\n");
+        return `${this.root} ${this.title}\n\nNotes\n${this.notes.join(' ')}\n\nTriads (chords)\n${triads}`;
     }
 
     includes(note) {
@@ -223,8 +215,7 @@ const SCALES = [
 let currentRoot = 'C';
 let currentScale = null;
 let currentTriad = -1;
-const triadsView = document.querySelector("#triads-view")
-const triadsUl = document.querySelector("#triads-view>ul");
+const details = document.querySelector('#details');
 const triadsSelect = document.querySelector("select#triads");
 function update(what) {
     if(what !== "triad") {
@@ -232,15 +223,12 @@ function update(what) {
             triadsSelect.removeChild(triadsSelect.lastChild);
         }
         const highLightRoot = document.createElement("option");
-        highLightRoot.innerHTML = "Root note";
+        highLightRoot.innerHTML = !!currentScale ? "Root note" : '';
         triadsSelect.append(highLightRoot);
-        while(triadsUl.firstChild) {
-            triadsUl.removeChild(triadsUl.lastChild);
-        }
+        details.innerHTML = '';
         if(!!currentScale) {
-            triadsView.classList.remove("hide");
+            details.innerHTML = currentScale.toString();
             currentScale.setRoot(currentRoot);
-            console.log(currentScale.toString());
             currentScale.triads.forEach((triad,index) => {
                 const [one,three,five] = triad;
                 const text = `[${index+1}] ${one} ${three} ${five}`;
@@ -249,13 +237,7 @@ function update(what) {
                 opt.value = index;
                 opt.innerHTML = text;
                 triadsSelect.append(opt);
-
-                const li = document.createElement("li");
-                li.innerHTML = text;
-                triadsUl.appendChild(li);
             });
-        } else {
-            triadsView.classList.add("hide");
         }
     }
 
