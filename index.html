@@ -1,5 +1,16 @@
 <!DOCTYPE html>
+<pre>
+TODO
+toggle finger borders different colors 1-N
+keybindings to swap scales and what is highlighted rather than select inputs (+ instruction text)
+    want to be able to toggle between scales quickly like flip-cards
+calculate chord names for triads
+alternate tunings (add string notes to left of nut)
+</pre>
 <style>
+body {
+    background-color: #eaeaea;
+}
 #container {
     margin-top: 50px;
     margin-bottom: 30px;
@@ -31,6 +42,7 @@ const CIRCULAR_NEXT = (circularArray,current) => {
 const NEXT_NOTE = (note) => CIRCULAR_NEXT(NOTES,note);
 
 class Scale {
+    // steps = [WH<number>]+ W=whole tone H=semi-tone <number>=number of semi-tones (2=W, 1=H)
     constructor(title,steps) {
         this.title = title;
         this.steps = steps;
@@ -40,12 +52,11 @@ class Scale {
     setRoot(root) {
         this.root = root;
         this.notes = this.steps.split('').reduce((notes,wh) => {
-                let n = NEXT_NOTE(notes[notes.length-1]);
-                if(wh === 'W') {
-                    n = NEXT_NOTE(n);
-                } else if (wh === '3') {
-                    // step and one half
-                    n = NEXT_NOTE(n);
+                const semiTones = (wh === 'H')
+                    ? 1
+                    : ((wh === 'W') ? 2 : parseInt(wh))
+                let n = notes[notes.length-1];
+                for(let i = 0; i < semiTones; i++) {
                     n = NEXT_NOTE(n);
                 }
                 notes.push(n);
@@ -85,11 +96,13 @@ class Scale {
 }
 
 // Declare the chart dimensions and margins.
-const width = 1200;
-const height = 200;
-const neckPadding = 15; // distance from the edte of the neck to the E strings
+const width = 1100;
+const height = 180;
+const neckPadding = 15; // distance from the edge of the neck to the E strings
 const fingerRadius = neckPadding-3;
-const noteYOffset = 4; // pushes the text in a finger bubble down to center it, not calculated, could be better
+const fretMarkerRadius = fingerRadius-4;
+const fretMarkerFill = '#483827';
+const noteYOffset = 5; // pushes the text in a finger bubble down to center it, not calculated, could be better
 const fretCount = 16;
 const fretWidth = 4;
 const stringWidth = 2;
@@ -99,7 +112,7 @@ const topPadding = 20; // distance between highest fret and end of neck
 const fretBoardLength = (width-nutWidth-topPadding);
 const fretSeparation = (fretBoardLength-(fretWidth*fretCount))/fretCount;
 
-const rootFill = '#aaa';
+const highlightFill = '#aaa';
 
 // Create the SVG container.
 const svg = d3.create("svg")
@@ -111,28 +124,52 @@ neck.append("rect")
     .attr("class","fretboard")
     .attr("width",width)
     .attr("height",height)
-    .attr("fill","#fff")
+    .attr("fill","#794b2a")
     .attr("stroke","#000")
 const frets = neck.append("g").attr("class","frets");
 frets.append("rect")
     .attr("class","nut")
     .attr("width",nutWidth)
     .attr("height",height)
-    .attr("fill","#000");
+    .attr("fill","#ededed");
 
 class Fret {
     constructor(index) {
         this.index = index;
         this.x = (fretBoardLength/fretCount)*(index+1);
+        this.fretNumber = index+1;
     }
 
     draw() {
         frets.append("rect")
-            .attr("class",`fret fret-${this.index+1}`)
+            .attr("class",`fret fret-${this.fretNumber}`)
             .attr("x",this.x)
             .attr("width",fretWidth)
             .attr("height",height)
-            .attr("fill","#000");
+            .attr("fill","#969799");
+        if([3,5,7,9,15,17,19,21].includes(this.fretNumber)) {
+            frets.append("circle")
+                .attr("stroke-width",0.5)
+                .attr("fill",fretMarkerFill)
+                .attr("r",fretMarkerRadius)
+                .attr("cx",(this.x-(fretSeparation/2)))
+                .attr("cy",(height/2));
+        } else if (this.fretNumber === 12) {
+            const y1 = (height/2)+(fretMarkerRadius*4);
+            const y2 = (height/2)-(fretMarkerRadius*4);
+            frets.append("circle")
+                .attr("stroke-width",0.5)
+                .attr("fill",fretMarkerFill)
+                .attr("r",fretMarkerRadius)
+                .attr("cx",(this.x-(fretSeparation/2)))
+                .attr("cy",y1);
+            frets.append("circle")
+                .attr("stroke-width",0.5)
+                .attr("fill",fretMarkerFill)
+                .attr("r",fretMarkerRadius)
+                .attr("cx",(this.x-(fretSeparation/2)))
+                .attr("cy",y2);
+        }
         return this;
     }
 }
@@ -140,8 +177,6 @@ const FRETS = [];
 for(let i = 0; i < fretCount; i++) {
     FRETS.push(new Fret(i).draw());
 }
-
-// TODO dots on fretboard 3,5,7,12, etc.
 
 const stringsG = neck.append("g")
     .attr("class","strings")
@@ -165,6 +200,7 @@ class String {
             .attr("class",`string ${this.note}`)
             .attr("width",width)
             .attr("height",stringWidth)
+            .attr("fill","#e1bb95")
             .attr("y",this.y);
         return this;
     }
@@ -181,7 +217,7 @@ class String {
                 .attr("class","finger")
             const x = FRETS[i].x-(fretSeparation/2);
             fg.append("circle")
-                .attr("fill",!!scale && scale.highlightNote(n) ? rootFill : "#fff")
+                .attr("fill",!!scale && scale.highlightNote(n) ? highlightFill : "#fff")
                 .attr("stroke-width",0.5)
                 .attr("stroke",'#000')
                 .attr("r",fingerRadius)
