@@ -60,7 +60,8 @@ class Scale {
             const five = CIRCULAR_NEXT(this.notes,CIRCULAR_NEXT(this.notes,three))
             return [one,three,five];
         });
-        this.focusedTriad = null;       
+        this.focusedTriad = null;
+        return this;
     }
 
     toString() {
@@ -227,8 +228,7 @@ function update(what) {
         triadsSelect.append(highLightRoot);
         details.innerHTML = '';
         if(!!currentScale) {
-            details.innerHTML = currentScale.toString();
-            currentScale.setRoot(currentRoot);
+            details.innerHTML = currentScale.setRoot(currentRoot).toString();
             currentScale.triads.forEach((triad,index) => {
                 const [one,three,five] = triad;
                 const text = `[${index+1}] ${one} ${three} ${five}`;
