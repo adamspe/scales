@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <pre>
 TODO
-toggle finger borders different colors for scale numbers
 toggle between notes and scale numbers
 calculate chord names for triads
 </pre>
@@ -12,7 +11,7 @@ body {
 #container {}
 .neck-wrapper {
    display: flex;
-   margin-top: 50px;
+   margin-top: 10px;
    margin-bottom: 30px;
 }
 .string-notes {
@@ -20,7 +19,35 @@ body {
     flex-direction: column;
     justify-content: space-around;
 }
+#legend {
+    display: flex;
+    gap: 5px;
+}
+.swatch {
+    width: 20px;
+    height: 20px;
+    border: 1px solid #000;
+    color: #fff;
+    font-weight: bold;
+    text-align: center;
+}
+/* need to keep these in line with the JS constants */
+.swatch.one {
+    background-color: red;
+}
+.swatch.three {
+    background-color: green;
+}
+.swatch.five {
+    background-color: blue;;
+}
 </style>
+<div id="legend">
+    <div class="swatch one">1</div>
+    <div class="swatch three">3</div>
+    <div class="swatch five">5</div>
+</div>
+
 <div class="neck-wrapper">
     <div class="string-notes">
         <select id="string-0"></select>
@@ -54,6 +81,10 @@ const CIRCULAR_NEXT = (circularArray,current) => {
     return i < circularArray.length-1 ? circularArray[i+1] : circularArray[0];
 };
 const NEXT_NOTE = (note) => CIRCULAR_NEXT(NOTES,note);
+const DEFAULT_STROKE = '#000';
+const ONE_STROKE = 'red';
+const THREE_STROKE = 'green';
+const FIVE_STROKE = 'blue';
 
 class Scale {
     // steps = [WH<number>]+ W=whole tone H=semi-tone <number>=number of semi-tones (2=W, 1=H)
@@ -102,11 +133,33 @@ class Scale {
         this.focusedTriad = triad;
     }
 
-    highlightNote(note) {
+    fillNote(note) {
         return !!this.focusedTriad
             ? this.focusedTriad.includes(note)
             : note === this.root;
     }
+
+    strokeNote(note) {
+        let stroke = DEFAULT_STROKE;
+        if(!!this.focusedTriad) {
+            const i = this.focusedTriad.indexOf(note);
+            switch(i) {
+                case 0:
+                    stroke = ONE_STROKE;
+                    break;
+                case 1:
+                    stroke = THREE_STROKE;
+                    break;
+                case 2:
+                    stroke = FIVE_STROKE;
+                    break;
+            }
+        } else if (note === this.root) {
+            stroke = ONE_STROKE;
+        }
+        return stroke;
+    }
+
 }
 
 // Declare the chart dimensions and margins.
@@ -244,9 +297,9 @@ class String {
                 .attr("class","finger")
             const x = FRETS[i].x-(fretSeparation/2);
             fg.append("circle")
-                .attr("fill",!!scale && scale.highlightNote(n) ? highlightFill : "#fff")
-                .attr("stroke-width",0.5)
-                .attr("stroke",'#000')
+                .attr("fill",!!scale && scale.fillNote(n) ? highlightFill : "#fff")
+                .attr("stroke",!!scale ? scale.strokeNote(n) : DEFAULT_STROKE)
+                .attr("stroke-width",1)
                 .attr("r",fingerRadius)
                 .attr("cx",x);
             fg.append("text")
