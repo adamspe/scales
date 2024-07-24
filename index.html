@@ -4,18 +4,35 @@ TODO
 toggle finger borders different colors for scale numbers
 toggle between notes and scale numbers
 calculate chord names for triads
-alternate tunings (add string notes to left of nut)
 </pre>
 <style>
 body {
     background-color: #eaeaea;
 }
-#container {
-    margin-top: 50px;
-    margin-bottom: 30px;
+#container {}
+.neck-wrapper {
+   display: flex;
+   margin-top: 50px;
+   margin-bottom: 30px;
+}
+.string-notes {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
 }
 </style>
-<div id="container"></div>
+<div class="neck-wrapper">
+    <div class="string-notes">
+        <select id="string-0"></select>
+        <select id="string-1"></select>
+        <select id="string-2"></select>
+        <select id="string-3"></select>
+        <select id="string-4"></select>
+        <select id="string-5"></select>
+    </div>
+    <div id="container"></div>
+</div>
+
 <div id="controls">
     <label for="roots">Root</label>
     <select id="roots"></select>
@@ -184,12 +201,24 @@ const fingers = neck.append("g")
 
 class String {
     constructor(note,index) {
+        this.scale = null;
         this.note = note;
         this.index = index;
         this.y = (this.index*((height-(neckPadding*2))/5));
         this.fingerG = fingers.append("g")
             .attr("class",`fingers-${note}-${index}`)
             .attr("transform",`translate(0,${this.y})`);
+        this.select = document.getElementById(`string-${index}`);
+        NOTES.forEach(n => {
+            const o = document.createElement("option");
+            o.value = o.innerHTML = n;
+            o.selected = n === this.note;
+            this.select.append(o);
+        });
+        this.select.addEventListener("change",() => {
+            this.note = this.select.value;
+            this.notes(this.scale);
+        });
     }
 
     draw() {
@@ -203,6 +232,7 @@ class String {
     }
 
     notes(scale) {
+        this.scale = scale;
         this.fingerG.selectAll('.finger').remove();
         let n = this.note;
         for(let i = 0; i < fretCount; i++) {
